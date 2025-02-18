@@ -1,0 +1,54 @@
+# ASP.NET Core (.NET Framework)
+# Build and test ASP.NET Core projects targeting the full .NET Framework.
+# Add steps that publish symbols, save build artifacts, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
+
+trigger:
+- develop
+- stage
+- main
+
+pool: 'Windows-Agents'
+
+variables: 
+  ${{ if eq( variables['Build.SourceBranchName'], 'develop' ) }}: 
+    artifactName: Dev
+    configuration: debug   
+  ${{ if eq( variables['Build.SourceBranchName'], 'stage' ) }}: 
+    artifactName: Stg
+    configuration: debug    
+  ${{ if eq( variables['Build.SourceBranchName'], 'main' ) }}: 
+    artifactName: Main
+    configuration: release    
+  ${{ if and(ne( variables['Build.SourceBranchName'], 'main' ),ne( variables['Build.SourceBranchName'], 'stage' ),ne( variables['Build.SourceBranchName'], 'develop' )) }}:
+    artifactName: Drop
+    configuration: debug
+
+steps:
+- task: DotNetCoreCLI@2
+  inputs:
+      command: 'restore'
+      feedsToUse: 'select'
+      vstsFeed: '50e20806-3617-417f-95a0-051c82fa0843/a5caf6d5-4b3a-4ec4-bc98-36b71bcaada0'
+
+- task: DotNetCoreCLI@2  
+  displayName: 'Build Project'
+  inputs:
+    command: 'build'
+    configuration: 'x64 $(configuration)'
+    arguments: '-o $(Build.artifactstagingdirectory)/$(artifactName)'
+
+- task: ArchiveFiles@2
+  inputs:
+    rootFolderOrFile: '$(Build.BinariesDirectory)'
+    includeRootFolder: true
+    archiveType: 'zip'
+    archiveFile: '$(Build.ArtifactStagingDirectory)/binaries/$(artifactName)/$(Build.BuildId).zip'
+    replaceExistingArchive: true
+
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)/$(artifactName)'
+    ArtifactName: ${{variables.artifactName}}
+    publishLocation: 'Container'
+    
